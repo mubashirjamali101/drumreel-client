@@ -66,9 +66,30 @@ export interface CredentialsFile {
 }
 
 export interface ClientOptions {
-  /** Base like https://api.drumreel.com — client appends /api/v1 */
-  apiBase?: string
-  apiKey?: string
+  /** API host, e.g. https://<your-drumreel-app-host> — the client appends /api/v1. Required. */
+  apiBase: string
+  /** dr_live_… / dr_test_… key, sent as `Authorization: Bearer <key>`. */
+  apiKey: string
   /** Injected fetch for tests */
   fetch?: typeof globalThis.fetch
+  /** Per-request timeout in ms (default 30000). */
+  requestTimeoutMs?: number
+  /** Max retries for transient failures (default 3). GETs retry 429/5xx/network; POSTs retry 429 only. */
+  retries?: number
+  /** First retry delay in ms (default 500). */
+  retryBaseMs?: number
+  /** Max computed retry delay in ms (default 8000). */
+  retryMaxMs?: number
+  /** Give up instead of sleeping when Retry-After asks for longer than this (default 60000). */
+  maxRetryAfterMs?: number
+  /** Random source for jitter — injectable for tests. */
+  random?: () => number
+}
+
+/** Per-call options accepted by every client method. */
+export interface RequestOptions {
+  /** Caller cancellation; combined with the per-request timeout. */
+  signal?: AbortSignal
+  /** Override the client's retry count for this call (0 disables retries). */
+  retries?: number
 }

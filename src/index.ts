@@ -1,16 +1,24 @@
 export { DrumreelClient } from './client.js'
-export { AuthError, DrumreelError } from './errors.js'
+export { normalizeApiBase } from './api-base.js'
+export {
+  AbortedError,
+  AuthError,
+  ConfigError,
+  DrumreelError,
+  ForbiddenError,
+  TimeoutError,
+} from './errors.js'
 export {
   clearCredentials,
   configDir,
   credentialsPath,
-  DEFAULT_API_BASE,
   loadCredentials,
   resolveApiBase,
   resolveApiKey,
   saveCredentials,
 } from './credentials.js'
-export { waitForJob, type PollOptions } from './poll.js'
+export { DEFAULT_WAIT_TIMEOUT_MS, waitForJob, type PollOptions } from './poll.js'
+export { backoffDelay, parseRetryAfter } from './retry.js'
 export { pkgVersion } from './version.js'
 export type {
   ClientOptions,
@@ -20,6 +28,7 @@ export type {
   Job,
   JobStatus,
   ListJobsResponse,
+  RequestOptions,
   RerunMode,
   VideoResponse,
 } from './types.js'
