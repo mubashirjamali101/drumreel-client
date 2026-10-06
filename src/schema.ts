@@ -3,7 +3,7 @@ import { DrumreelError } from './errors.js'
 import type { Job, JobWarning, ListJobsResponse } from './types.js'
 
 /**
- * Runtime schemas for v1 job responses, mirroring drumreel-saas `docs/public-api-contract.md`.
+ * Runtime schemas for v1 job responses, mirroring the hosted Drumreel API v1 contract as of 2026-10-07.
  * Deliberately lenient so older/newer servers keep working: unknown fields pass through,
  * `status` is any string, and `warnings` defaults to [] when absent or malformed.
  */

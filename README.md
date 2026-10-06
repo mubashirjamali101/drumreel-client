@@ -125,7 +125,7 @@ Errors come back as `isError: true` with `{"error": {"message", "status", "code"
 
 ## API contract
 
-The client mirrors `docs/public-api-contract.md` in the (private) `drumreel-saas` repo at commit `7969a05`. That SaaS file is canonical; see [`SKILL.md`](./SKILL.md#api-summary) for the mirrored summary. Responses are parsed leniently (unknown fields pass through, `warnings` defaults to `[]`), so older and newer servers keep working.
+Mirrors the hosted Drumreel API v1 contract as of 2026-10-07 (includes job warnings). The hosted API is the source of truth; see [`SKILL.md`](./SKILL.md#api-summary) for the summary. Responses are parsed leniently (unknown fields pass through, `warnings` defaults to `[]`), so older and newer servers keep working.
 
 ## Agent skill
 

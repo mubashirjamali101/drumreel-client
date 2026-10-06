@@ -113,7 +113,7 @@ On timeout, `drumreel_wait_for_job` returns code `timeout` plus the last seen `j
 
 ## API (summary)
 
-> Mirrored from `docs/public-api-contract.md` in the (private) `drumreel-saas` repo at commit `7969a05`. That file is canonical; if this summary disagrees, the SaaS file wins.
+> Mirrors the hosted Drumreel API v1 contract as of 2026-10-07 (includes job warnings). If this summary disagrees with the hosted API, the hosted API wins.
 
 Base: `<api base>/api/v1` · Auth: `Authorization: Bearer dr_live_…|dr_test_…` (only header sent)
 Statuses: `queued|exploring|authoring|validating|recording|uploading|done|error`
