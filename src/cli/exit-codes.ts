@@ -24,7 +24,7 @@ export const EXIT = {
   API_ERROR: 6,
   /** Per-request timeout or `run --timeout` deadline exceeded. */
   TIMEOUT: 7,
-  /** Transient: rate limited (429), 5xx, or network failure after retries. */
+  /** Transient: request timeout (408), rate limited (429), 5xx, or network failure after retries. */
   UNAVAILABLE: 8,
   /** Interrupted (Ctrl-C). */
   ABORTED: 130,
@@ -39,7 +39,7 @@ export function exitCodeFor(err: unknown): number {
   if (err instanceof DrumreelError) {
     const s = err.status
     if (s === 404) return EXIT.NOT_FOUND
-    if (s === 429 || (s !== undefined && s >= 500) || err.code === 'network') return EXIT.UNAVAILABLE
+    if (s === 408 || s === 429 || (s !== undefined && s >= 500) || err.code === 'network') return EXIT.UNAVAILABLE
     if (s !== undefined && s >= 400) return EXIT.API_ERROR
   }
   return EXIT.FAILURE

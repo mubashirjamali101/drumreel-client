@@ -61,5 +61,8 @@
   "homepage": "https://github.com/mubashirjamali101/drumreel-client",
   "bugs": {
     "url": "https://github.com/mubashirjamali101/drumreel-client/issues"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

@@ -5,6 +5,7 @@ import { type Ctx, makeClient } from '../context.js'
 import { EXIT } from '../exit-codes.js'
 import { printJobHuman, printJson } from '../output.js'
 import { parseLimit } from '../parse.js'
+import { warningPrinter } from '../warnings.js'
 
 export function registerJobs(program: Command, ctx: Ctx): void {
   const out = ctx.io.stdout
@@ -39,6 +40,7 @@ export function registerJobs(program: Command, ctx: Ctx): void {
     .action(async (id: string, opts: { json?: boolean }, cmd: Command) => {
       const client = await makeClient(ctx, cmd)
       const job = await client.getJob(id)
+      warningPrinter(ctx.io.stderr)(job)
       if (opts.json) printJson(out, job)
       else printJobHuman(out, job)
       ctx.setCode(EXIT.OK)

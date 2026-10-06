@@ -35,13 +35,27 @@ export interface Job {
   share_url?: string | null
   video_ready: boolean
   progress?: number | string | null
+  /**
+   * Non-fatal issues, each "<code>: <message>" (e.g. "voiceover_missing_key: …").
+   * Always present from current servers; the client defaults it to [] for older ones.
+   * A job can be `done` and still have warnings.
+   */
+  warnings: string[]
   created_at: string
   updated_at: string
 }
 
+/** Known codes: voiceover_missing_key | voiceover_skipped | voiceover_failed. Unknown codes are informational. */
+export type JobWarningCode = 'voiceover_missing_key' | 'voiceover_skipped' | 'voiceover_failed' | (string & {})
+
+export interface JobWarning {
+  code: JobWarningCode
+  message: string
+}
+
 export interface ListJobsResponse {
   items: Job[]
-  next_cursor?: string
+  next_cursor?: string | null
 }
 
 export interface VideoResponse {

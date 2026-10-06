@@ -65,6 +65,48 @@ describe('MCP tools', () => {
     expect(calls.length).toBe(3)
   }, 15_000)
 
+  const W = 'voiceover_skipped: Voiceover was requested but narration was skipped; the video was rendered without narration.'
+
+  it('get_job surfaces warnings in the JSON and as a separate text block', async () => {
+    const mcp = await connect(makeClient(scriptedFetch([jsonResponse(200, job('done', { warnings: [W] }))]).fetch))
+    const res = (await mcp.callTool({ name: 'drumreel_get_job', arguments: { id: 'job_1' } })) as {
+      content: { text: string }[]
+    }
+    expect(JSON.parse(res.content[0]?.text ?? '{}').warnings).toEqual([W])
+    expect(res.content[1]?.text).toContain(`- warning: ${W}`)
+  })
+
+  it('get_job returns warnings: [] and no extra block for servers that omit the field', async () => {
+    const { warnings: _omit, ...legacy } = job('done')
+    const mcp = await connect(makeClient(scriptedFetch([jsonResponse(200, legacy)]).fetch))
+    const res = (await mcp.callTool({ name: 'drumreel_get_job', arguments: { id: 'job_1' } })) as {
+      content: { text: string }[]
+    }
+    expect(JSON.parse(res.content[0]?.text ?? '{}').warnings).toEqual([])
+    expect(res.content).toHaveLength(1)
+  })
+
+  it('wait_for_job returns the final job with warnings', async () => {
+    const { fetch } = scriptedFetch([jsonResponse(200, job('done', { warnings: [W] }))])
+    const mcp = await connect(makeClient(fetch))
+    const res = (await mcp.callTool({ name: 'drumreel_wait_for_job', arguments: { id: 'job_1' } })) as {
+      content: { text: string }[]
+    }
+    expect(JSON.parse(res.content[0]?.text ?? '{}')).toMatchObject({ status: 'done', warnings: [W] })
+    expect(res.content[1]?.text).toContain(W)
+  })
+
+  it('create_job passes through warnings if a server includes them', async () => {
+    const { fetch } = scriptedFetch([jsonResponse(201, { id: 'job_2', status: 'queued', warnings: [W] })])
+    const mcp = await connect(makeClient(fetch))
+    const res = (await mcp.callTool({
+      name: 'drumreel_create_job',
+      arguments: { url: 'https://x.test', prompt: 'p', enable_voiceover: true },
+    })) as { content: { text: string }[] }
+    expect(JSON.parse(res.content[0]?.text ?? '{}')).toMatchObject({ id: 'job_2', warnings: [W] })
+    expect(res.content[1]?.text).toContain(W)
+  })
+
   it('drumreel_wait_for_job rejects out-of-range timeouts', async () => {
     const mcp = await connect(makeClient(scriptedFetch([]).fetch))
     const res = (await mcp.callTool({

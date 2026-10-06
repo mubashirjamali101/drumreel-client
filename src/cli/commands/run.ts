@@ -8,6 +8,7 @@ import { type Ctx, makeClient } from '../context.js'
 import { EXIT, errorJson, exitCodeFor, formatError } from '../exit-codes.js'
 import { printJobHuman, printJson } from '../output.js'
 import { parseDuration, parsePositiveInt } from '../parse.js'
+import { warningPrinter } from '../warnings.js'
 
 interface RunOpts {
   url: string
@@ -53,10 +54,18 @@ async function runAction(ctx: Ctx, opts: RunOpts, cmd: Command): Promise<void> {
         },
       },
       { signal: ac.signal },
-    )
+    ).catch((err: unknown) => {
+      if (maybeCreated(err)) {
+        stderr.write(
+          'drumreel: the job may already have been created; check `drumreel jobs --limit 5` before retrying to avoid a duplicate\n',
+        )
+      }
+      throw err
+    })
     if (!opts.json) stderr.write(`created ${created.id} (${created.status})\n`)
 
     let lastStatus: string | undefined
+    const printWarnings = warningPrinter(stderr)
     const job = await waitForJob(client, created.id, {
       intervalMs,
       timeoutMs,
@@ -64,6 +73,7 @@ async function runAction(ctx: Ctx, opts: RunOpts, cmd: Command): Promise<void> {
       onUpdate: (j) => {
         if (!opts.json && j.status !== lastStatus) stderr.write(`  → ${j.status}\n`)
         lastStatus = j.status
+        printWarnings(j)
       },
       onRetry: (err, delayMs) => {
         if (!opts.json) stderr.write(`  ! ${formatError(err).replace(/^drumreel: /, '')}; retrying in ${Math.ceil(delayMs / 1000)}s\n`)
@@ -94,6 +104,16 @@ async function runAction(ctx: Ctx, opts: RunOpts, cmd: Command): Promise<void> {
   } finally {
     if (ctx.io.handleSignals) process.removeListener('SIGINT', onSigint)
   }
+}
+
+/**
+ * True when a failed POST /jobs may still have created the job server-side:
+ * request timeout, network failure, 5xx, or Ctrl-C mid-request. (A 429/4xx was rejected outright.)
+ */
+function maybeCreated(err: unknown): boolean {
+  if (err instanceof TimeoutError || err instanceof AbortedError) return true
+  if (!(err instanceof DrumreelError)) return false
+  return err.code === 'network' || (err.status !== undefined && err.status >= 500)
 }
 
 /** GET /jobs/:id/video, tolerating a brief 404 right after video_ready flips. Errors are returned, not swallowed. */

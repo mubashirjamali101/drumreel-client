@@ -73,21 +73,24 @@ drumreel mcp              # stdio MCP server
 
 `run` creates a job, polls until `done` / `error`, then prints `share_url` and a signed video URL.
 If `--timeout` passes, it exits `7` and the job keeps running server-side (`drumreel status <id>`).
+If creating the job itself times out (`7`) or fails with a network / 5xx error (`8`), the job may already exist — check `drumreel jobs --limit 5` before retrying to avoid a duplicate.
 
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success |
+| 0 | Success (`run`: job `done` and video URL fetched) |
 | 1 | `run`: job finished with status `error`; or unexpected failure |
-| 2 | Usage / config (bad flag, invalid `--limit` / `--timeout`, missing or insecure API base) |
-| 3 | HTTP 401 / no API key |
-| 4 | HTTP 403 |
-| 5 | HTTP 404 (unknown job, video not ready) |
-| 6 | Other API 4xx |
-| 7 | Request timeout or `run --timeout` deadline |
-| 8 | 429 / 5xx / network failure after retries |
+| 2 | Usage / config: bad flag, invalid `--limit`/`--timeout`, missing or insecure API base |
+| 3 | Not authenticated: HTTP 401 or no API key |
+| 4 | Forbidden: HTTP 403 (key valid, action not allowed) |
+| 5 | Not found: HTTP 404 (unknown job, or video not ready yet) |
+| 6 | Other API 4xx (validation, conflict, …) |
+| 7 | Timeout: per-request timeout or `run --timeout` deadline |
+| 8 | Unavailable: 408 / 429 / 5xx / network error after retries — retry later |
 | 130 | Interrupted (Ctrl-C) |
+
+Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server code>)`.
 
 ### Rate limits, retries and timeouts
 
@@ -95,6 +98,12 @@ If `--timeout` passes, it exits `7` and the job keeps running server-side (`drum
 - `GET`s retry `408/429/5xx`, network errors and timeouts (3 retries, exponential backoff + jitter). `POST`s retry only `429`, so a job is never created twice.
 - `Retry-After` (seconds or HTTP-date) is honored; waits longer than 60 s are not slept — the command fails with exit `8`.
 - While `run` / `drumreel_wait_for_job` is waiting, transient errors never end the wait early; polling backs off (2 s → 15 s while status is unchanged) until the overall deadline.
+
+### Job warnings
+
+Job objects carry `warnings: string[]` (always present on current servers; treated as `[]` when an older server omits it). Each entry is `<code>: <message>` — match on the code, not the message. Known codes: `voiceover_missing_key`, `voiceover_skipped`, `voiceover_failed`; unknown codes are informational. A job can be `done` and still have warnings.
+
+`run` and `status` print each distinct warning once to stderr as `warning: <code>: <message>`; `--json` output includes `warnings`. Warnings never change the exit code. MCP job results include `warnings` (plus a separate text block when non-empty).
 
 ## MCP
 
@@ -113,6 +122,10 @@ drumreel mcp
 | `drumreel_rerun_job` | `POST /api/v1/jobs/:id/rerun` |
 
 Errors come back as `isError: true` with `{"error": {"message", "status", "code", "retry_after_ms"?, "retryable"}}`.
+
+## API contract
+
+Mirrors the hosted Drumreel API v1 contract as of 2026-10-07 (includes job warnings). The hosted API is the source of truth; see [`SKILL.md`](./SKILL.md#api-summary) for the summary. Responses are parsed leniently (unknown fields pass through, `warnings` defaults to `[]`), so older and newer servers keep working.
 
 ## Agent skill
 

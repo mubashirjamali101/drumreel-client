@@ -18,6 +18,7 @@ export function apiError(status: number, code: string, message: string, headers?
   return jsonResponse(status, { error: { code, message } }, headers)
 }
 
+/** Raw v1 job body as the server sends it (current servers always include `warnings`). */
 export function job(status: JobStatus, extra: Partial<Job> = {}): Job {
   return {
     id: 'job_1',
@@ -25,6 +26,7 @@ export function job(status: JobStatus, extra: Partial<Job> = {}): Job {
     phase: status,
     video_ready: status === 'done',
     share_url: status === 'done' ? `${BASE}/s/abc` : null,
+    warnings: [],
     created_at: '2026-10-07T00:00:00.000Z',
     updated_at: '2026-10-07T00:00:00.000Z',
     ...extra,

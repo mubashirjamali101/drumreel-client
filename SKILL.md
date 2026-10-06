@@ -51,6 +51,7 @@ drumreel rerun <id> --mode script --json
 
 `run` creates a job, polls until `done` / `error`, then fetches the signed video URL.
 If `--timeout` (default `30m`) passes, `run` exits `7`; the job **keeps running** server-side — check it with `drumreel status <id>`.
+If creating the job itself times out (`7`) or fails with a network / 5xx error (`8`), the job **may already exist** — check `drumreel jobs --limit 5` before retrying to avoid a duplicate.
 
 ## Exit codes
 
@@ -64,7 +65,7 @@ If `--timeout` (default `30m`) passes, `run` exits `7`; the job **keeps running*
 | 5 | Not found: HTTP 404 (unknown job, or video not ready yet) |
 | 6 | Other API 4xx (validation, conflict, …) |
 | 7 | Timeout: per-request timeout or `run --timeout` deadline |
-| 8 | Unavailable: 429 / 5xx / network error after retries — retry later |
+| 8 | Unavailable: 408 / 429 / 5xx / network error after retries — retry later |
 | 130 | Interrupted (Ctrl-C) |
 
 Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server code>)`.
@@ -75,6 +76,21 @@ Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server cod
 - `GET` requests retry `408/429/5xx`, network errors and timeouts up to 3 times with exponential backoff + jitter; `POST` (create/rerun) only retries `429`, so jobs are never duplicated.
 - `Retry-After` (seconds or HTTP-date) is honored; if it asks for more than 60 s the CLI stops and exits `8`.
 - While waiting for a job, transient errors never abort the wait: polling backs off (2 s growing to 15 s while status is unchanged; error backoff up to 60 s or `Retry-After`) until the deadline.
+
+## Job warnings
+
+Job objects carry `warnings: string[]` — non-fatal issues, ordered by first occurrence, de-duplicated. A job can be `done` **and** have warnings (e.g. a video rendered without narration). Older servers may omit the field; the client then treats it as `[]`.
+
+Each entry is `<code>: <message>`. Match on the code (text before the first `": "`), never on the message; unknown codes are informational.
+
+| Code | When |
+|------|------|
+| `voiceover_missing_key` | `enable_voiceover: true` but the server has no TTS key; job finishes `done` with a silent video (no voiceover credits charged) |
+| `voiceover_skipped` | Narration was skipped for another reason; video has no narration |
+| `voiceover_failed` | TTS or muxing failed; video kept without narration |
+
+- CLI: `run` and `status` print each distinct warning once to stderr as `warning: <code>: <message>`, and `--json` output includes `warnings`. Warnings **never change the exit code**.
+- MCP: job results include `warnings` in the JSON; when non-empty, a second text block lists them.
 
 ## MCP
 
@@ -97,11 +113,15 @@ On timeout, `drumreel_wait_for_job` returns code `timeout` plus the last seen `j
 
 ## API (summary)
 
+> Mirrors the hosted Drumreel API v1 contract as of 2026-10-07 (includes job warnings). If this summary disagrees with the hosted API, the hosted API wins.
+
 Base: `<api base>/api/v1` · Auth: `Authorization: Bearer dr_live_…|dr_test_…` (only header sent)
 Statuses: `queued|exploring|authoring|validating|recording|uploading|done|error`
 
 - `POST /jobs` `{url, prompt, options?: {model?, enable_voiceover?}}` → `{id, status}`
-- `GET /jobs/:id` → `{id, status, phase, error?, share_url?, video_ready, progress?, created_at, updated_at}`
-- `GET /jobs?cursor=&limit=` → `{items, next_cursor?}`
+- `GET /jobs/:id` → `{id, status, phase, error?, share_url?, video_ready, progress?, warnings, created_at, updated_at}`
+- `GET /jobs?cursor=&limit=` → `{items, next_cursor?}` (each item is a job object, including `warnings`)
 - `GET /jobs/:id/video` → `{url, expires_at}` (404 before ready)
 - `POST /jobs/:id/rerun` `{mode: full|script}` → `{id, status}`
+- `warnings: string[]` — always present on job objects (`[]` when none), entries `<code>: <message>`
+- `429` responses always include `Retry-After: <integer seconds>`; error body `{"error":{"code":"rate_limited","message":…}}`
