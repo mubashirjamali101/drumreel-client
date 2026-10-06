@@ -77,6 +77,21 @@ Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server cod
 - `Retry-After` (seconds or HTTP-date) is honored; if it asks for more than 60 s the CLI stops and exits `8`.
 - While waiting for a job, transient errors never abort the wait: polling backs off (2 s growing to 15 s while status is unchanged; error backoff up to 60 s or `Retry-After`) until the deadline.
 
+## Job warnings
+
+Job objects carry `warnings: string[]` — non-fatal issues, ordered by first occurrence, de-duplicated. A job can be `done` **and** have warnings (e.g. a video rendered without narration). Older servers may omit the field; the client then treats it as `[]`.
+
+Each entry is `<code>: <message>`. Match on the code (text before the first `": "`), never on the message; unknown codes are informational.
+
+| Code | When |
+|------|------|
+| `voiceover_missing_key` | `enable_voiceover: true` but the server has no TTS key; job finishes `done` with a silent video (no voiceover credits charged) |
+| `voiceover_skipped` | Narration was skipped for another reason; video has no narration |
+| `voiceover_failed` | TTS or muxing failed; video kept without narration |
+
+- CLI: `run` and `status` print each distinct warning once to stderr as `warning: <code>: <message>`, and `--json` output includes `warnings`. Warnings **never change the exit code**.
+- MCP: job results include `warnings` in the JSON; when non-empty, a second text block lists them.
+
 ## MCP
 
 ```bash
@@ -98,11 +113,15 @@ On timeout, `drumreel_wait_for_job` returns code `timeout` plus the last seen `j
 
 ## API (summary)
 
+> Mirrored from `docs/public-api-contract.md` in the (private) `drumreel-saas` repo at commit `7969a05`. That file is canonical; if this summary disagrees, the SaaS file wins.
+
 Base: `<api base>/api/v1` · Auth: `Authorization: Bearer dr_live_…|dr_test_…` (only header sent)
 Statuses: `queued|exploring|authoring|validating|recording|uploading|done|error`
 
 - `POST /jobs` `{url, prompt, options?: {model?, enable_voiceover?}}` → `{id, status}`
-- `GET /jobs/:id` → `{id, status, phase, error?, share_url?, video_ready, progress?, created_at, updated_at}`
-- `GET /jobs?cursor=&limit=` → `{items, next_cursor?}`
+- `GET /jobs/:id` → `{id, status, phase, error?, share_url?, video_ready, progress?, warnings, created_at, updated_at}`
+- `GET /jobs?cursor=&limit=` → `{items, next_cursor?}` (each item is a job object, including `warnings`)
 - `GET /jobs/:id/video` → `{url, expires_at}` (404 before ready)
 - `POST /jobs/:id/rerun` `{mode: full|script}` → `{id, status}`
+- `warnings: string[]` — always present on job objects (`[]` when none), entries `<code>: <message>`
+- `429` responses always include `Retry-After: <integer seconds>`; error body `{"error":{"code":"rate_limited","message":…}}`

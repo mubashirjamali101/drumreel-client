@@ -99,6 +99,12 @@ Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server cod
 - `Retry-After` (seconds or HTTP-date) is honored; waits longer than 60 s are not slept — the command fails with exit `8`.
 - While `run` / `drumreel_wait_for_job` is waiting, transient errors never end the wait early; polling backs off (2 s → 15 s while status is unchanged) until the overall deadline.
 
+### Job warnings
+
+Job objects carry `warnings: string[]` (always present on current servers; treated as `[]` when an older server omits it). Each entry is `<code>: <message>` — match on the code, not the message. Known codes: `voiceover_missing_key`, `voiceover_skipped`, `voiceover_failed`; unknown codes are informational. A job can be `done` and still have warnings.
+
+`run` and `status` print each distinct warning once to stderr as `warning: <code>: <message>`; `--json` output includes `warnings`. Warnings never change the exit code. MCP job results include `warnings` (plus a separate text block when non-empty).
+
 ## MCP
 
 ```bash
@@ -116,6 +122,10 @@ drumreel mcp
 | `drumreel_rerun_job` | `POST /api/v1/jobs/:id/rerun` |
 
 Errors come back as `isError: true` with `{"error": {"message", "status", "code", "retry_after_ms"?, "retryable"}}`.
+
+## API contract
+
+The client mirrors `docs/public-api-contract.md` in the (private) `drumreel-saas` repo at commit `7969a05`. That SaaS file is canonical; see [`SKILL.md`](./SKILL.md#api-summary) for the mirrored summary. Responses are parsed leniently (unknown fields pass through, `warnings` defaults to `[]`), so older and newer servers keep working.
 
 ## Agent skill
 
