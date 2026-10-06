@@ -16,6 +16,7 @@ describe('exit-code mapping', () => {
     [new ForbiddenError(), EXIT.FORBIDDEN],
     [new DrumreelError('x', { status: 404 }), EXIT.NOT_FOUND],
     [new DrumreelError('x', { status: 422 }), EXIT.API_ERROR],
+    [new DrumreelError('x', { status: 408 }), EXIT.UNAVAILABLE],
     [new DrumreelError('x', { status: 429 }), EXIT.UNAVAILABLE],
     [new DrumreelError('x', { status: 503 }), EXIT.UNAVAILABLE],
     [new DrumreelError('x', { code: 'network' }), EXIT.UNAVAILABLE],
@@ -75,6 +76,7 @@ describe('runCli', () => {
     [apiError(404, 'not_found', 'no job'), EXIT.NOT_FOUND, /HTTP 404/],
     [apiError(422, 'invalid', 'bad id'), EXIT.API_ERROR, /code: invalid/],
     [apiError(503, 'unavailable', 'down'), EXIT.UNAVAILABLE, /HTTP 503/],
+    [apiError(408, 'request_timeout', 'slow upstream'), EXIT.UNAVAILABLE, /HTTP 408/],
   ])('maps API responses to exit codes (%#)', async (res, code, msg) => {
     const { io, err } = captureIo(await env(), scriptedFetch([res]).fetch)
     expect(await runCli(['status', 'job_1'], io)).toBe(code)
@@ -129,6 +131,42 @@ describe('runCli', () => {
     expect(code).toBe(EXIT.TIMEOUT)
     expect(err()).toMatch(/Timed out after 100ms waiting for job job_1/)
     expect(err()).toMatch(/drumreel status job_1/)
+  })
+
+  it('408 still failing after retries exits 8 (not 6)', async () => {
+    const { fetch, calls } = scriptedFetch([apiError(408, 'request_timeout', 'slow upstream')])
+    const { io } = captureIo(await env(), fetch)
+    expect(await runCli(['status', 'job_1'], io)).toBe(EXIT.UNAVAILABLE)
+    expect(calls).toHaveLength(4) // 1 attempt + 3 retries
+  })
+
+  const CREATE_HINT = /may already have been created; check `drumreel jobs --limit 5`/
+
+  it('run: create network error exits 8 and suggests `drumreel jobs`', async () => {
+    const { io, err } = captureIo(await env(), scriptedFetch([new TypeError('socket hang up')]).fetch)
+    expect(await runCli(['run', '--url', 'https://x.test', '--prompt', 'p'], io)).toBe(EXIT.UNAVAILABLE)
+    expect(err()).toMatch(CREATE_HINT)
+  })
+
+  it('run: create request timeout exits 7 and suggests `drumreel jobs`', async () => {
+    const { io, err } = captureIo(await env(), hangingFetch())
+    io.clientDefaults = { ...io.clientDefaults, requestTimeoutMs: 30 }
+    expect(await runCli(['run', '--url', 'https://x.test', '--prompt', 'p'], io)).toBe(EXIT.TIMEOUT)
+    expect(err()).toMatch(CREATE_HINT)
+  })
+
+  it('run: create 5xx suggests `drumreel jobs`; 429 and 4xx do not', async () => {
+    const five = captureIo(await env(), scriptedFetch([apiError(502, 'bad_gateway', 'upstream')]).fetch)
+    expect(await runCli(['run', '--url', 'https://x.test', '--prompt', 'p'], five.io)).toBe(EXIT.UNAVAILABLE)
+    expect(five.err()).toMatch(CREATE_HINT)
+
+    const rl = captureIo(await env(), scriptedFetch([apiError(429, 'rate_limited', 'slow', { 'Retry-After': '3600' })]).fetch)
+    expect(await runCli(['run', '--url', 'https://x.test', '--prompt', 'p'], rl.io)).toBe(EXIT.UNAVAILABLE)
+    expect(rl.err()).not.toMatch(CREATE_HINT)
+
+    const bad = captureIo(await env(), scriptedFetch([apiError(422, 'invalid_url', 'bad url')]).fetch)
+    expect(await runCli(['run', '--url', 'https://x.test', '--prompt', 'p'], bad.io)).toBe(EXIT.API_ERROR)
+    expect(bad.err()).not.toMatch(CREATE_HINT)
   })
 
   it('--help exits 0', async () => {
