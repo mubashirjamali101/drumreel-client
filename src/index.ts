@@ -19,6 +19,7 @@ export {
 } from './credentials.js'
 export { DEFAULT_WAIT_TIMEOUT_MS, waitForJob, type PollOptions } from './poll.js'
 export { backoffDelay, parseRetryAfter } from './retry.js'
+export { JobSchema, KNOWN_WARNING_CODES, ListJobsSchema, parseJob, parseListJobs, parseWarning } from './schema.js'
 export { pkgVersion } from './version.js'
 export type {
   ClientOptions,
@@ -27,6 +28,8 @@ export type {
   CredentialsFile,
   Job,
   JobStatus,
+  JobWarning,
+  JobWarningCode,
   ListJobsResponse,
   RequestOptions,
   RerunMode,

@@ -1,5 +1,6 @@
 import { normalizeApiBase } from './api-base.js'
 import { AuthError, DrumreelError, ForbiddenError, TimeoutError } from './errors.js'
+import { parseJob, parseListJobs } from './schema.js'
 import { abortReason, isRetryable, isRetryableStatus, parseRetryAfter, retryDelay, sleep } from './retry.js'
 import type {
   ClientOptions,
@@ -52,7 +53,7 @@ export class DrumreelClient {
   }
 
   getJob(id: string, opts?: RequestOptions): Promise<Job> {
-    return this.request<Job>('GET', `/jobs/${encodeURIComponent(id)}`, undefined, opts)
+    return this.request<unknown>('GET', `/jobs/${encodeURIComponent(id)}`, undefined, opts).then(parseJob)
   }
 
   listJobs(q?: { cursor?: string; limit?: number }, opts?: RequestOptions): Promise<ListJobsResponse> {
@@ -60,7 +61,7 @@ export class DrumreelClient {
     if (q?.cursor) params.set('cursor', q.cursor)
     if (q?.limit !== undefined) params.set('limit', String(q.limit))
     const qs = params.toString()
-    return this.request<ListJobsResponse>('GET', `/jobs${qs ? `?${qs}` : ''}`, undefined, opts)
+    return this.request<unknown>('GET', `/jobs${qs ? `?${qs}` : ''}`, undefined, opts).then(parseListJobs)
   }
 
   /** Signed video URL. The API returns 404 until the job's video is ready. */
