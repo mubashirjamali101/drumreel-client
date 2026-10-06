@@ -31,10 +31,11 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.3.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
