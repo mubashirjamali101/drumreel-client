@@ -51,6 +51,7 @@ drumreel rerun <id> --mode script --json
 
 `run` creates a job, polls until `done` / `error`, then fetches the signed video URL.
 If `--timeout` (default `30m`) passes, `run` exits `7`; the job **keeps running** server-side — check it with `drumreel status <id>`.
+If creating the job itself times out (`7`) or fails with a network / 5xx error (`8`), the job **may already exist** — check `drumreel jobs --limit 5` before retrying to avoid a duplicate.
 
 ## Exit codes
 
@@ -64,7 +65,7 @@ If `--timeout` (default `30m`) passes, `run` exits `7`; the job **keeps running*
 | 5 | Not found: HTTP 404 (unknown job, or video not ready yet) |
 | 6 | Other API 4xx (validation, conflict, …) |
 | 7 | Timeout: per-request timeout or `run --timeout` deadline |
-| 8 | Unavailable: 429 / 5xx / network error after retries — retry later |
+| 8 | Unavailable: 408 / 429 / 5xx / network error after retries — retry later |
 | 130 | Interrupted (Ctrl-C) |
 
 Errors print to stderr as `drumreel: <message> (HTTP <status>, code: <server code>)`.
