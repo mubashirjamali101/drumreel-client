@@ -7,7 +7,7 @@ export function printJson(out: Out, data: unknown): void {
 
 export function printJobHuman(out: Out, job: Job): void {
   const row = (k: string, v: unknown): void => {
-    out.write(`${`${k}:`.padEnd(12)}${String(v)}\n`)
+    out.write(`${`${k}:`.padEnd(Math.max(12, k.length + 2))}${String(v)}\n`)
   }
   row('id', job.id)
   row('status', job.status)

@@ -8,6 +8,7 @@ import { type Ctx, makeClient } from '../context.js'
 import { EXIT, errorJson, exitCodeFor, formatError } from '../exit-codes.js'
 import { printJobHuman, printJson } from '../output.js'
 import { parseDuration, parsePositiveInt } from '../parse.js'
+import { warningPrinter } from '../warnings.js'
 
 interface RunOpts {
   url: string
@@ -64,6 +65,7 @@ async function runAction(ctx: Ctx, opts: RunOpts, cmd: Command): Promise<void> {
     if (!opts.json) stderr.write(`created ${created.id} (${created.status})\n`)
 
     let lastStatus: string | undefined
+    const printWarnings = warningPrinter(stderr)
     const job = await waitForJob(client, created.id, {
       intervalMs,
       timeoutMs,
@@ -71,6 +73,7 @@ async function runAction(ctx: Ctx, opts: RunOpts, cmd: Command): Promise<void> {
       onUpdate: (j) => {
         if (!opts.json && j.status !== lastStatus) stderr.write(`  → ${j.status}\n`)
         lastStatus = j.status
+        printWarnings(j)
       },
       onRetry: (err, delayMs) => {
         if (!opts.json) stderr.write(`  ! ${formatError(err).replace(/^drumreel: /, '')}; retrying in ${Math.ceil(delayMs / 1000)}s\n`)

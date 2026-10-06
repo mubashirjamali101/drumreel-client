@@ -4,7 +4,7 @@ import { DrumreelClient } from '../client.js'
 import { resolveApiBase, resolveApiKey } from '../credentials.js'
 import { AuthError } from '../errors.js'
 import { waitForJob } from '../poll.js'
-import { errText, jsonText } from './result.js'
+import { errText, resultText } from './result.js'
 
 export type ClientFactory = () => Promise<DrumreelClient>
 
@@ -23,7 +23,7 @@ export const WAIT_MAX_SECONDS = 3600
 function safe<A>(fn: (args: A, signal: AbortSignal) => Promise<unknown>) {
   return async (args: A, extra: { signal: AbortSignal }) => {
     try {
-      return jsonText(await fn(args, extra.signal))
+      return resultText(await fn(args, extra.signal))
     } catch (err) {
       return errText(err)
     }
@@ -57,7 +57,7 @@ export function registerTools(server: McpServer, makeClient: ClientFactory = cli
   server.registerTool(
     'drumreel_get_job',
     {
-      description: 'Get job status/phase/share_url/video_ready.',
+      description: 'Get job status/phase/share_url/video_ready/warnings.',
       inputSchema: { id: z.string().min(1).describe('Job id') },
     },
     safe(async ({ id }, signal) => (await makeClient()).getJob(id, { signal })),
@@ -67,7 +67,8 @@ export function registerTools(server: McpServer, makeClient: ClientFactory = cli
     'drumreel_wait_for_job',
     {
       description:
-        'Poll a job until it is done or error (backoff + Retry-After aware). Returns the final job. ' +
+        'Poll a job until it is done or error (backoff + Retry-After aware). Returns the final job, ' +
+        'including non-fatal `warnings` ("<code>: <message>"). ' +
         `On timeout returns an error with code "timeout" and the last seen job; call again to keep waiting.`,
       inputSchema: {
         id: z.string().min(1).describe('Job id'),
